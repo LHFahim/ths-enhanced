@@ -6,7 +6,7 @@ import java.sql.SQLException;
 import java.util.Properties;
 import java.io.InputStream;
 
-/* simple jdbc connector that reads db.properties from classpath */
+
 public class Database {
 
     private static String url, user, password;
