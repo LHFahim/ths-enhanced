@@ -8,6 +8,7 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.HashMap;
+import java.util.Map;
 
 public class ClientHandler implements Runnable {
     private final Socket socket;
@@ -71,6 +72,31 @@ public class ClientHandler implements Runnable {
                     return Response.ok(user);
                 } catch (Exception ex) {
                     return Response.err("login failed: " + ex.getMessage());
+                }
+            }
+
+            case "SEND_MESSAGE": {
+                try {
+                    int sender = ((Double) req.payload.get("sender_id")).intValue();
+                    int receiver = ((Double) req.payload.get("receiver_id")).intValue();
+                    String body = (String) req.payload.get("body");
+                    String attachment = (String) req.payload.getOrDefault("attachment", null);
+
+                    com.fahim.ths.repo.MessageDAO.insert(sender, receiver, body, attachment);
+                    return Response.ok(Map.of("status", "sent"));
+                } catch (Exception ex) {
+                    return Response.err("failed to send message: " + ex.getMessage());
+                }
+            }
+
+            case "LIST_MESSAGES": {
+                try {
+                    int userA = ((Double) req.payload.get("userA")).intValue();
+                    int userB = ((Double) req.payload.get("userB")).intValue();
+                    var list = com.fahim.ths.repo.MessageDAO.listThread(userA, userB);
+                    return Response.ok(Map.of("messages", list));
+                } catch (Exception ex) {
+                    return Response.err("failed to list messages: " + ex.getMessage());
                 }
             }
 
