@@ -4,11 +4,15 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
 
-
+/* creates database + tables programmatically; run at app start */
 public class DatabaseInit {
 
     public static void init() throws SQLException {
-        try (Connection conn = Database.getConnection()) {
+        // create DB if not exists
+        Database.ensureDatabaseExists();
+
+        // create tables in that DB
+        try (Connection conn = Database.getAppConnection()) {
             conn.setAutoCommit(false);
             try (Statement st = conn.createStatement()) {
 
@@ -108,9 +112,9 @@ public class DatabaseInit {
         }
     }
 
-    /* seed a doctor + patient so ui has data on first run */
+
     public static void seed() throws SQLException {
-        try (Connection conn = Database.getConnection(); Statement st = conn.createStatement()) {
+        try (Connection conn = Database.getAppConnection(); Statement st = conn.createStatement()) {
             st.executeUpdate("""
             INSERT INTO users(role,name,email,pass_hash)
             SELECT 'DOCTOR','dr smith','drsmith@example.com','$2a$10$placeholderhash'
