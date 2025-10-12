@@ -4,7 +4,6 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
 
-/* creates database + tables programmatically; run at app start */
 public class DatabaseInit {
 
     public static void init() throws SQLException {
@@ -16,10 +15,11 @@ public class DatabaseInit {
             conn.setAutoCommit(false);
             try (Statement st = conn.createStatement()) {
 
+                // create users table
                 st.executeUpdate("""
                 CREATE TABLE IF NOT EXISTS users(
                   id INT AUTO_INCREMENT PRIMARY KEY,
-                  role ENUM('PATIENT','DOCTOR','ADMIN') NOT NULL,
+                  role ENUM('PATIENT','STAFF','DOCTOR','ADMIN') NOT NULL,
                   name VARCHAR(100) NOT NULL,
                   email VARCHAR(120) NOT NULL UNIQUE,
                   pass_hash VARCHAR(255) NOT NULL,
@@ -27,6 +27,13 @@ public class DatabaseInit {
                 ) ENGINE=InnoDB;
                 """);
 
+
+                st.executeUpdate("""
+                ALTER TABLE users 
+                MODIFY role ENUM('PATIENT','STAFF','DOCTOR','ADMIN') NOT NULL;
+                """);
+
+                // patients table
                 st.executeUpdate("""
                 CREATE TABLE IF NOT EXISTS patients(
                   id INT PRIMARY KEY,
@@ -36,6 +43,7 @@ public class DatabaseInit {
                 ) ENGINE=InnoDB;
                 """);
 
+                // doctors table
                 st.executeUpdate("""
                 CREATE TABLE IF NOT EXISTS doctors(
                   id INT PRIMARY KEY,
@@ -45,6 +53,7 @@ public class DatabaseInit {
                 ) ENGINE=InnoDB;
                 """);
 
+                // appointments table
                 st.executeUpdate("""
                 CREATE TABLE IF NOT EXISTS appointments(
                   id INT AUTO_INCREMENT PRIMARY KEY,
@@ -60,6 +69,7 @@ public class DatabaseInit {
                 ) ENGINE=InnoDB;
                 """);
 
+                // vitals table
                 st.executeUpdate("""
                 CREATE TABLE IF NOT EXISTS vitals(
                   id INT AUTO_INCREMENT PRIMARY KEY,
@@ -75,7 +85,7 @@ public class DatabaseInit {
                 ) ENGINE=InnoDB;
                 """);
 
-                /* feature 1: messaging */
+                // feature 1: messaging
                 st.executeUpdate("""
                 CREATE TABLE IF NOT EXISTS messages(
                   id INT AUTO_INCREMENT PRIMARY KEY,
@@ -90,7 +100,7 @@ public class DatabaseInit {
                 ) ENGINE=InnoDB;
                 """);
 
-                /* feature 2: vitals alerts */
+                // feature 2: vitals alerts
                 st.executeUpdate("""
                 CREATE TABLE IF NOT EXISTS alerts(
                   id INT AUTO_INCREMENT PRIMARY KEY,
@@ -112,31 +122,40 @@ public class DatabaseInit {
         }
     }
 
-
     public static void seed() throws SQLException {
         try (Connection conn = Database.getAppConnection(); Statement st = conn.createStatement()) {
+
+            // doctor
             st.executeUpdate("""
             INSERT INTO users(role,name,email,pass_hash)
             SELECT 'DOCTOR','dr smith','drsmith@example.com','pass123'
             WHERE NOT EXISTS(SELECT 1 FROM users WHERE email='drsmith@example.com');
-        """);
+            """);
 
+            // patient
             st.executeUpdate("""
             INSERT INTO users(role,name,email,pass_hash)
             SELECT 'PATIENT','alice patient','alice@example.com','pass123'
             WHERE NOT EXISTS(SELECT 1 FROM users WHERE email='alice@example.com');
-        """);
+            """);
 
+            // staff
+            st.executeUpdate("""
+            INSERT INTO users(role,name,email,pass_hash)
+            SELECT 'STAFF','sam staff','staff@example.com','pass123'
+            WHERE NOT EXISTS(SELECT 1 FROM users WHERE email='staff@example.com');
+            """);
+
+            // link doctor and patient details
             st.executeUpdate("""
             INSERT IGNORE INTO doctors(id,provider_no,specialty)
             SELECT id,'PROV001','general' FROM users WHERE email='drsmith@example.com';
-        """);
+            """);
 
             st.executeUpdate("""
             INSERT IGNORE INTO patients(id,medicare_no,dob)
             SELECT id,'MED123','1995-01-10' FROM users WHERE email='alice@example.com';
-        """);
+            """);
         }
     }
-
 }
