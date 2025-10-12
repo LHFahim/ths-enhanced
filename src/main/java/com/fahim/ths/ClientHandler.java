@@ -60,6 +60,20 @@ public class ClientHandler implements Runnable {
                     return Response.err("db error: " + ex.getMessage());
                 }
             }
+            case "LOGIN": {
+                try {
+                    String email = (String) req.payload.get("email");
+                    String password = (String) req.payload.get("password");
+                    if (email == null || password == null) return Response.err("email and password required");
+
+                    var user = com.fahim.ths.repo.UserDAO.validateLogin(email, password);
+                    if (user == null) return Response.err("invalid email or password");
+                    return Response.ok(user);
+                } catch (Exception ex) {
+                    return Response.err("login failed: " + ex.getMessage());
+                }
+            }
+
             default:
                 return Response.err("unknown op: " + req.op);
         }

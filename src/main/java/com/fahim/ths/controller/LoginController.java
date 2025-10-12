@@ -1,5 +1,9 @@
 package com.fahim.ths.controller;
 
+import com.fahim.ths.Response;
+import com.fahim.ths.ServerMain;
+import com.fahim.ths.Session;
+import com.fahim.ths.ThsClient;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
@@ -14,44 +18,59 @@ import java.util.Map;
 
 public class LoginController {
 
-    @FXML private TextField usernameField;
+    @FXML private TextField usernameField;   // used for email
     @FXML private PasswordField passwordField;
-
-    private static final Map<String, Cred> USERS = Map.of(
-            "patient", new Cred(Role.PATIENT, "pass123"),
-            "staff",   new Cred(Role.STAFF,   "pass123"),
-            "doctor",  new Cred(Role.DOCTOR,  "pass123")
-    );
-
-    private enum Role { PATIENT, STAFF, DOCTOR }
-
-    private record Cred(Role role, String password) {}
 
     @FXML
     private void onLogin(ActionEvent e) {
-        String u = usernameField.getText() == null ? "" : usernameField.getText().trim().toLowerCase();
-        String p = passwordField.getText() == null ? "" : passwordField.getText();
+        String email = usernameField.getText() == null ? "" : usernameField.getText().trim();
+        String password = passwordField.getText() == null ? "" : passwordField.getText();
 
-        Cred cred = USERS.get(u);
-        if (cred == null || !cred.password.equals(p)) {
-            new Alert(Alert.AlertType.ERROR, "Invalid username or password.\nTry patient/staff/doctor with pass123.")
-                    .show();
+        if (email.isEmpty() || password.isEmpty()) {
+            new Alert(Alert.AlertType.ERROR, "please enter both email and password").show();
             return;
         }
 
-        String fxml = switch (cred.role) {
-            case PATIENT -> "/fxml/PatientView.fxml";
-            case STAFF   -> "/fxml/StaffView.fxml";
-            case DOCTOR  -> "/fxml/DoctorView.fxml";
-        };
-
         try {
+            // talk to the running server
+            ThsClient client = new ThsClient("127.0.0.1", ServerMain.PORT);
+
+            // send both email + password as payload
+            Response res = client.send("LOGIN", Map.of(
+                    "email", email,
+                    "password", password
+            ));
+
+            if (!res.ok) {
+                new Alert(Alert.AlertType.ERROR, "login failed: " + res.error).show();
+                return;
+            }
+
+            // save user in session for later
+            Session.setCurrentUser(res.data);
+            String role = String.valueOf(res.data.get("role")).toUpperCase();
+
+            // choose FXML by role
+            String fxml = switch (role) {
+                case "PATIENT" -> "/fxml/PatientView.fxml";
+                case "STAFF"   -> "/fxml/StaffView.fxml"; // optional, if you have one
+                case "DOCTOR"  -> "/fxml/DoctorView.fxml";
+                default -> null;
+            };
+
+            if (fxml == null) {
+                new Alert(Alert.AlertType.ERROR, "unsupported role: " + role).show();
+                return;
+            }
+
+            // load next scene
             Scene scene = new Scene(FXMLLoader.load(getClass().getResource(fxml)), 1000, 700);
             Stage st = (Stage) ((Node) e.getSource()).getScene().getWindow();
             st.setScene(scene);
             st.centerOnScreen();
+
         } catch (Exception ex) {
-            new Alert(Alert.AlertType.ERROR, "Failed to load screen: " + ex.getMessage()).show();
+            new Alert(Alert.AlertType.ERROR, "login error: " + ex.getMessage()).show();
             ex.printStackTrace();
         }
     }

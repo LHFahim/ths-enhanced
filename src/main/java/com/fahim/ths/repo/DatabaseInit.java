@@ -117,22 +117,26 @@ public class DatabaseInit {
         try (Connection conn = Database.getAppConnection(); Statement st = conn.createStatement()) {
             st.executeUpdate("""
             INSERT INTO users(role,name,email,pass_hash)
-            SELECT 'DOCTOR','dr smith','drsmith@example.com','$2a$10$placeholderhash'
+            SELECT 'DOCTOR','dr smith','drsmith@example.com','pass123'
             WHERE NOT EXISTS(SELECT 1 FROM users WHERE email='drsmith@example.com');
-            """);
+        """);
+
             st.executeUpdate("""
             INSERT INTO users(role,name,email,pass_hash)
-            SELECT 'PATIENT','alice patient','alice@example.com','$2a$10$placeholderhash'
+            SELECT 'PATIENT','alice patient','alice@example.com','pass123'
             WHERE NOT EXISTS(SELECT 1 FROM users WHERE email='alice@example.com');
-            """);
+        """);
+
             st.executeUpdate("""
             INSERT IGNORE INTO doctors(id,provider_no,specialty)
             SELECT id,'PROV001','general' FROM users WHERE email='drsmith@example.com';
-            """);
+        """);
+
             st.executeUpdate("""
             INSERT IGNORE INTO patients(id,medicare_no,dob)
             SELECT id,'MED123','1995-01-10' FROM users WHERE email='alice@example.com';
-            """);
+        """);
         }
     }
+
 }
