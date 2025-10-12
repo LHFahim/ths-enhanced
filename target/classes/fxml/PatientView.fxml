@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.geometry.Insets?>
+
+<BorderPane xmlns="http://javafx.com/javafx/21.0.3" xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="com.fahim.ths.controller.PatientController">
+
+  <top>
+    <HBox spacing="10" alignment="CENTER_RIGHT" BorderPane.alignment="CENTER">
+      <Label text="Patient Portal — Bookings, Refills, Vital Signs"
+             style="-fx-font-size: 18px; -fx-font-weight: bold;"/>
+      <Button text="Start Telehealth" onAction="#startTelehealth"/>
+      <Button text="Logout" onAction="#logout"/>
+    </HBox>
+  </top>
+
+  <center>
+    <TabPane>
+      <tabs>
+
+        <!-- ===================== book consultation ===================== -->
+        <Tab text="Book Consultation">
+          <BorderPane>
+
+            <center>
+              <GridPane hgap="10" vgap="10">
+                <padding><Insets top="10" right="10" bottom="10" left="10"/></padding>
+
+                <Label text="Specialist:" GridPane.columnIndex="0" GridPane.rowIndex="0"/>
+                <TextField fx:id="specialistField" GridPane.columnIndex="1" GridPane.rowIndex="0"/>
+
+                <Label text="Date:" GridPane.columnIndex="0" GridPane.rowIndex="1"/>
+                <DatePicker fx:id="datePicker" GridPane.columnIndex="1" GridPane.rowIndex="1"/>
+
+                <Label text="Time:" GridPane.columnIndex="0" GridPane.rowIndex="2"/>
+                <HBox spacing="6" GridPane.columnIndex="1" GridPane.rowIndex="2">
+                  <Spinner fx:id="hourSpinner" prefWidth="80"/>
+                  <Spinner fx:id="minuteSpinner" prefWidth="80"/>
+                </HBox>
+
+                <Label text="Clinic (optional):" GridPane.columnIndex="0" GridPane.rowIndex="3"/>
+                <TextField fx:id="locationField" GridPane.columnIndex="1" GridPane.rowIndex="3"/>
+
+                <Button text="Book" onAction="#book" GridPane.columnIndex="1" GridPane.rowIndex="4"/>
+              </GridPane>
+            </center>
+
+            <bottom>
+              <TableView fx:id="apptTable" prefHeight="220">
+                <columns>
+                  <TableColumn fx:id="idCol"        text="ID"         prefWidth="80"/>
+                  <TableColumn fx:id="specialistCol" text="Specialist" prefWidth="160"/>
+                  <TableColumn fx:id="timeCol"       text="Time"       prefWidth="220"/>
+                  <TableColumn fx:id="locationCol"   text="Location"   prefWidth="180"/>
+                </columns>
+              </TableView>
+            </bottom>
+
+          </BorderPane>
+        </Tab>
+
+        <!-- ===================== prescription refills ===================== -->
+        <Tab text="Prescription Refills">
+          <BorderPane>
+
+            <center>
+              <GridPane hgap="10" vgap="10">
+                <padding><Insets top="10" right="10" bottom="10" left="10"/></padding>
+
+                <Label text="Medicine:" GridPane.columnIndex="0" GridPane.rowIndex="0"/>
+                <TextField fx:id="medField" GridPane.columnIndex="1" GridPane.rowIndex="0"/>
+
+                <Label text="Dosage:" GridPane.columnIndex="0" GridPane.rowIndex="1"/>
+                <TextField fx:id="doseField" GridPane.columnIndex="1" GridPane.rowIndex="1"/>
+
+                <Button text="Request Refill" onAction="#requestRefill"
+                        GridPane.columnIndex="1" GridPane.rowIndex="2"/>
+              </GridPane>
+            </center>
+
+            <bottom>
+              <TableView fx:id="rxTable" prefHeight="220">
+                <columns>
+                  <TableColumn fx:id="rxIdCol"       text="ID"        prefWidth="80"/>
+                  <TableColumn fx:id="rxMedCol"      text="Medicine"  prefWidth="160"/>
+                  <TableColumn fx:id="rxDoseCol"     text="Dosage"    prefWidth="160"/>
+                  <TableColumn fx:id="rxApprovedCol" text="Approved"  prefWidth="100"/>
+                </columns>
+              </TableView>
+            </bottom>
+
+          </BorderPane>
+        </Tab>
+
+        <!-- ===================== vital signs  ===================== -->
+        <Tab text="Vital Signs (Enter/Import)">
+          <BorderPane>
+
+            <center>
+              <GridPane hgap="10" vgap="10">
+                <padding><Insets top="10" right="10" bottom="10" left="10"/></padding>
+
+                <Label text="Pulse"       GridPane.columnIndex="0" GridPane.rowIndex="0"/>
+                <Spinner fx:id="pulseSpin" GridPane.columnIndex="1" GridPane.rowIndex="0"/>
+
+                <Label text="Temperature" GridPane.columnIndex="0" GridPane.rowIndex="1"/>
+                <Spinner fx:id="tempSpin"  GridPane.columnIndex="1" GridPane.rowIndex="1"/>
+
+                <Label text="Respiration" GridPane.columnIndex="0" GridPane.rowIndex="2"/>
+                <Spinner fx:id="respSpin"  GridPane.columnIndex="1" GridPane.rowIndex="2"/>
+
+                <Label text="Systolic"    GridPane.columnIndex="0" GridPane.rowIndex="3"/>
+                <Spinner fx:id="sysSpin"   GridPane.columnIndex="1" GridPane.rowIndex="3"/>
+
+                <Label text="Diastolic"   GridPane.columnIndex="0" GridPane.rowIndex="4"/>
+                <Spinner fx:id="diaSpin"   GridPane.columnIndex="1" GridPane.rowIndex="4"/>
+
+                <HBox spacing="8" GridPane.columnIndex="1" GridPane.rowIndex="5">
+                  <Button text="Save Vitals" onAction="#saveVitals"/>
+                  <Button text="Import CSV" onAction="#importVitalsCsv"/>
+                </HBox>
+              </GridPane>
+            </center>
+
+            <bottom>
+              <TableView fx:id="vitalTable" prefHeight="220">
+                <columns>
+                  <TableColumn fx:id="vPulseCol" text="Pulse" prefWidth="80"/>
+                  <TableColumn fx:id="vTempCol"  text="Temp (°C)" prefWidth="100"/>
+                  <TableColumn fx:id="vRespCol"  text="Resp" prefWidth="80"/>
+                  <TableColumn fx:id="vSysCol"   text="Sys" prefWidth="80"/>
+                  <TableColumn fx:id="vDiaCol"   text="Dia" prefWidth="80"/>
+                  <TableColumn fx:id="vTimeCol"  text="Recorded At" prefWidth="160"/>
+                </columns>
+              </TableView>
+            </bottom>
+
+          </BorderPane>
+        </Tab>
+
+      </tabs>
+    </TabPane>
+  </center>
+</BorderPane>

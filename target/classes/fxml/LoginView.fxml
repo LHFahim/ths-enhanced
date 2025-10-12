@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<BorderPane xmlns="http://javafx.com/javafx/21.0.3" xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="com.fahim.ths.controller.LoginController">
+  <center>
+    <VBox spacing="12" alignment="CENTER">
+      <padding><Insets top="60" bottom="40" left="40" right="40"/></padding>
+      <Label text="THS — Login" style="-fx-font-size: 22px; -fx-font-weight: bold;"/>
+      <Label text="Username: patient/staff/doctor, Password: pass123"/>
+      <GridPane hgap="10" vgap="10">
+        <Label text="username:" GridPane.rowIndex="0" GridPane.columnIndex="0"/>
+        <TextField fx:id="usernameField" promptText="patient" GridPane.rowIndex="0" GridPane.columnIndex="1"/>
+        <Label text="password:" GridPane.rowIndex="1" GridPane.columnIndex="0"/>
+        <PasswordField fx:id="passwordField" promptText="any" GridPane.rowIndex="1" GridPane.columnIndex="1"/>
+      </GridPane>
+      <Button text="login" onAction="#onLogin" />
+    </VBox>
+  </center>
+</BorderPane>
