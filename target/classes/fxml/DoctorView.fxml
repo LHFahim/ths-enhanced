@@ -30,6 +30,7 @@
   <bottom>
     <TabPane>
       <tabs>
+
         <!-- ================= diagnosis and treatment ================= -->
         <Tab text="Diagnosis &amp; Treatment">
           <GridPane hgap="10" vgap="10">
@@ -126,6 +127,14 @@
                     GridPane.columnIndex="1" GridPane.rowIndex="5"/>
           </GridPane>
         </Tab>
+
+        <!-- ================= messages ================= -->
+        <Tab text="Messages" closable="false">
+          <content>
+            <fx:include source="/fxml/MessagesView.fxml"/>
+          </content>
+        </Tab>
+
       </tabs>
     </TabPane>
   </bottom>

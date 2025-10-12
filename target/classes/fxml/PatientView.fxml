@@ -139,6 +139,13 @@
           </BorderPane>
         </Tab>
 
+        <!-- ===================== messages ===================== -->
+        <Tab text="Messages" closable="false">
+          <content>
+            <fx:include source="/fxml/MessagesView.fxml"/>
+          </content>
+        </Tab>
+
       </tabs>
     </TabPane>
   </center>

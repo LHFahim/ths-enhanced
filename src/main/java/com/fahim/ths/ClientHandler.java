@@ -100,6 +100,18 @@ public class ClientHandler implements Runnable {
                 }
             }
 
+            case "FIND_USER_BY_EMAIL": {
+                try {
+                    String email = (String) req.payload.get("email");
+                    var user = com.fahim.ths.repo.UserDAO.findByEmail(email);
+                    if (user == null) return Response.err("no such user");
+                    return Response.ok(user);
+                } catch (Exception ex) {
+                    return Response.err("lookup failed: " + ex.getMessage());
+                }
+            }
+
+
             default:
                 return Response.err("unknown op: " + req.op);
         }
