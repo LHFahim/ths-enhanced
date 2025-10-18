@@ -49,7 +49,7 @@ public class MainApp extends Application {
                 FXMLLoader.load(getClass().getResource("/fxml/LoginView.fxml")),
                 960, 620
         );
-        stage.setTitle("THS - TeleHealth System (Initial Prototype)");
+        stage.setTitle("THS - TeleHealth System (Enhanced)");
         stage.setScene(scene);
         stage.centerOnScreen();
         stage.show();
