@@ -111,6 +111,51 @@ public class ClientHandler implements Runnable {
                 }
             }
 
+            case "ADD_VITALS": {
+                try {
+                    int patientId = ((Number) req.payload.get("patient_id")).intValue();
+                    Double pulse = req.payload.get("pulse") == null ? null : ((Number) req.payload.get("pulse")).doubleValue();
+                    Double temp  = req.payload.get("temperature") == null ? null : ((Number) req.payload.get("temperature")).doubleValue();
+                    Double resp  = req.payload.get("respiration") == null ? null : ((Number) req.payload.get("respiration")).doubleValue();
+                    Double sys   = req.payload.get("systolic") == null ? null : ((Number) req.payload.get("systolic")).doubleValue();
+                    Double dia   = req.payload.get("diastolic") == null ? null : ((Number) req.payload.get("diastolic")).doubleValue();
+                    String notes = (String) req.payload.getOrDefault("notes", null);
+
+                    // insert vitals
+                    com.fahim.ths.repo.VitalDAO.insert(patientId, null, pulse, temp, resp, sys, dia, notes);
+
+                    // evaluate alert rules (server-side)
+                    try (java.sql.Connection c = com.fahim.ths.repo.Database.getAppConnection()) {
+                        int alerts = com.fahim.ths.repo.AlertRules.evaluateAndCreateAlerts(c, patientId, pulse, temp, resp, sys, dia);
+                        return Response.ok(java.util.Map.of("status", "ok", "alerts_created", alerts));
+                    }
+                } catch (Exception ex) {
+                    return Response.err("failed to add vitals: " + ex.getMessage());
+                }
+            }
+
+            case "LIST_VITALS_FOR_PATIENT": {
+                try {
+                    int patientId = ((Number) req.payload.get("patient_id")).intValue();
+                    int limit = req.payload.get("limit") == null ? 100 : ((Number) req.payload.get("limit")).intValue();
+                    var list = com.fahim.ths.repo.VitalDAO.listForPatient(patientId, limit);
+                    return Response.ok(java.util.Map.of("vitals", list));
+                } catch (Exception ex) {
+                    return Response.err("failed to list vitals: " + ex.getMessage());
+                }
+            }
+
+            case "LIST_ALERTS_FOR_PATIENT": {
+                try {
+                    int patientId = ((Number) req.payload.get("patient_id")).intValue();
+                    int limit = req.payload.get("limit") == null ? 100 : ((Number) req.payload.get("limit")).intValue();
+                    var list = com.fahim.ths.repo.AlertDAO.listForPatient(patientId, limit);
+                    return Response.ok(java.util.Map.of("alerts", list));
+                } catch (Exception ex) {
+                    return Response.err("failed to list alerts: " + ex.getMessage());
+                }
+            }
+
 
             default:
                 return Response.err("unknown op: " + req.op);
