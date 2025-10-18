@@ -30,14 +30,14 @@ import java.util.Map;
 
 /**
  * PatientController:
- * - Appointments & Prescriptions remain backed by in-memory DataStore (as before).
- * - Vitals are now sent to the server (ADD_VITALS) and listed from MySQL (LIST_VITALS_FOR_PATIENT).
- *   The server will auto-create alerts if readings are abnormal.
+ * - Appointments table now loads from MySQL via server (LIST_APPTS_FOR_PATIENT).
+ * - Booking creates appointments in MySQL (ADD_APPOINTMENT).
+ * - Vitals use server (ADD_VITALS / LIST_VITALS_FOR_PATIENT) with auto-alerts.
+ * - Prescriptions remain in DataStore for this prototype.
  */
 public class PatientController {
 
-    private final DataStore db = DataStore.get(); // still used for appts/prescriptions demo
-    // NOTE: patientId for vitals comes from Session.currentUserId() now (numeric from DB)
+    private final DataStore db = DataStore.get(); // still used for prescriptions in this prototype
 
     // ================= book consultation =================
     @FXML private TextField specialistField;
@@ -61,7 +61,7 @@ public class PatientController {
     @FXML private TableColumn<Prescription, String> rxDoseCol;
     @FXML private TableColumn<Prescription, String> rxApprovedCol;
 
-    // ================= vital signs (now backed by server/db) =================
+    // ================= vital signs (server/db) =================
     @FXML private Spinner<Double> pulseSpin, tempSpin, respSpin, sysSpin, diaSpin;
     @FXML private TableView<VitalSign> vitalTable;
     @FXML private TableColumn<VitalSign, String> vPulseCol;
@@ -90,7 +90,7 @@ public class PatientController {
         sysSpin.setValueFactory(new SpinnerValueFactory.DoubleSpinnerValueFactory(80, 200, 120, 1));
         diaSpin.setValueFactory(new SpinnerValueFactory.DoubleSpinnerValueFactory(50, 120, 80, 1));
 
-        // appointment table
+        // appointment table columns
         idCol.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getId()));
         specialistCol.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getSpecialist()));
         timeCol.setCellValueFactory(c -> new SimpleStringProperty(
@@ -103,7 +103,7 @@ public class PatientController {
         rxDoseCol.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getDosage()));
         rxApprovedCol.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().isApproved() ? "Yes" : "No"));
 
-        // vital table (columns map to your VitalSign model)
+        // vitals table
         vPulseCol.setCellValueFactory(c -> new SimpleStringProperty(String.valueOf((int)c.getValue().getPulse())));
         vTempCol.setCellValueFactory(c -> new SimpleStringProperty(String.format("%.1f", c.getValue().getTemperature())));
         vRespCol.setCellValueFactory(c -> new SimpleStringProperty(String.valueOf((int)c.getValue().getRespiration())));
@@ -116,37 +116,69 @@ public class PatientController {
     }
 
     private void refreshTables() {
-        // appointments & prescriptions remain local (as per your existing prototype)
-        apptTable.setItems(FXCollections.observableArrayList(db.appointmentsFor("P001")));
+        // appointments from DB via server
+        refreshAppointmentsFromServer();
+
+        // prescriptions still from DataStore (demo)
         rxTable.setItems(FXCollections.observableArrayList(
                 db.allPrescriptions().stream().filter(r -> r.getPatientId().equals("P001")).toList()));
 
-        // vitals now come from the server/db
+        // vitals from server/db
         refreshVitalsFromServer();
     }
 
-    // ================= book consultation =================
+    // ================= book consultation (server/db) =================
     @FXML
     private void book(ActionEvent e) {
         LocalDate d = datePicker.getValue();
-        if (d == null) {
-            new Alert(Alert.AlertType.ERROR, "Choose a date").show();
-            return;
-        }
+        if (d == null) { new Alert(Alert.AlertType.ERROR, "Choose a date").show(); return; }
+
+        Integer patientId = Session.currentUserId();
+        if (patientId == null) { new Alert(Alert.AlertType.ERROR, "Not logged in").show(); return; }
+
+        // time + default duration 30 min
         LocalTime t = LocalTime.of(hourSpinner.getValue(), minuteSpinner.getValue());
-        LocalDateTime dt = LocalDateTime.of(d, t);
-        String loc = locationField.getText().isBlank() ? "Online" : locationField.getText().trim();
+        LocalDateTime start = LocalDateTime.of(d, t);
+        LocalDateTime end   = start.plusMinutes(30);
 
-        // still using DataStore demo for now
-        db.addAppointment("P001", specialistField.getText().trim(), dt, loc);
+        String facility = locationField.getText().isBlank() ? "Online" : locationField.getText().trim();
+        String specialist = specialistField.getText() == null ? "" : specialistField.getText().trim();
 
-        specialistField.clear();
-        locationField.clear();
+        try {
+            ThsClient c = new ThsClient("127.0.0.1", ServerMain.PORT);
 
-        refreshTables();
+            // pick doctor:
+            // if user typed an email, resolve that; otherwise default to drsmith@example.com
+            String docEmail = specialist.contains("@") ? specialist : "drsmith@example.com";
+            Response f = c.send("FIND_USER_BY_EMAIL", Map.of("email", docEmail));
+            if (!f.ok) { new Alert(Alert.AlertType.ERROR, "Doctor not found: " + docEmail).show(); return; }
+            int doctorId = ((Number) f.data.get("id")).intValue();
+
+            // create appointment in DB
+            Response r = c.send("ADD_APPOINTMENT", Map.of(
+                    "patient_id", patientId,
+                    "doctor_id", doctorId,
+                    "start_time", start.toString(),   // ISO_LOCAL_DATE_TIME
+                    "end_time",   end.toString(),
+                    "location",   facility,
+                    "notes",      specialist.isEmpty() ? "Booked via patient portal" : specialist
+            ));
+            if (!r.ok) { new Alert(Alert.AlertType.ERROR, r.error).show(); return; }
+
+            new Alert(Alert.AlertType.INFORMATION, "Appointment booked.").show();
+
+            specialistField.clear();
+            locationField.clear();
+
+            // refresh list from DB
+            refreshAppointmentsFromServer();
+        } catch (Exception ex) {
+            new Alert(Alert.AlertType.ERROR, "Booking failed: " + ex.getMessage()).show();
+            ex.printStackTrace();
+        }
     }
 
-    // ================= prescription refill =================
+    // ================= prescription refill (DataStore) =================
     @FXML
     private void requestRefill(ActionEvent e) {
         if (medField.getText().isBlank()) {
@@ -155,7 +187,6 @@ public class PatientController {
         }
 
         String dose = doseField.getText().isBlank() ? "1 tab daily" : doseField.getText().trim();
-        // still using DataStore demo for now
         db.addPrescription("P001", medField.getText().trim(), dose);
 
         medField.clear();
@@ -164,7 +195,7 @@ public class PatientController {
         refreshTables();
     }
 
-    // ================= vital signs (server/db) =================
+    // ================= vitals (server/db) =================
     @FXML
     private void saveVitals(ActionEvent e) {
         Integer meId = Session.currentUserId();
@@ -225,7 +256,6 @@ public class PatientController {
                 int sent = 0;
                 ThsClient c = new ThsClient("127.0.0.1", ServerMain.PORT);
                 for (var v : CsvVitals.read("P001", f)) {
-                    // send each row to server; server will evaluate alerts
                     Response r = c.send("ADD_VITALS", Map.of(
                             "patient_id", meId,
                             "pulse", v.getPulse(),
@@ -245,6 +275,7 @@ public class PatientController {
         }
     }
 
+    // ----- helpers for vitals mapping -----
     private void refreshVitalsFromServer() {
         Integer meId = Session.currentUserId();
         if (meId == null) {
@@ -255,27 +286,22 @@ public class PatientController {
             ThsClient c = new ThsClient("127.0.0.1", ServerMain.PORT);
             Response r = c.send("LIST_VITALS_FOR_PATIENT", Map.of("patient_id", meId, "limit", 100));
             if (!r.ok) {
-                // fallback to local (kept for demo completeness)
                 vitalTable.setItems(FXCollections.observableArrayList(db.vitalsFor("P001")));
                 return;
             }
 
             @SuppressWarnings("unchecked")
             List<Map<String, Object>> rows = (List<Map<String, Object>>) r.data.get("vitals");
-            var list = rows.stream()
-                    .map(this::toVitalSign)
-                    .toList();
+            var list = rows.stream().map(this::toVitalSign).toList();
 
             vitalTable.setItems(FXCollections.observableArrayList(list));
         } catch (Exception ex) {
-            // fallback to local if server not reachable
             vitalTable.setItems(FXCollections.observableArrayList(db.vitalsFor("P001")));
         }
     }
 
     private VitalSign toVitalSign(Map<String, Object> m) {
-        // Your model: new VitalSign(patientId, pulse, temp, resp, sys, dia, recordedAt)
-        String pid = String.valueOf(Session.currentUserId()); // display only
+        String pid = String.valueOf(Session.currentUserId());
         double pulse = asDouble(m.get("pulse"));
         double temp  = asDouble(m.get("temperature"));
         double resp  = asDouble(m.get("respiration"));
@@ -294,6 +320,43 @@ public class PatientController {
     private LocalDateTime parseSqlTimestamp(String s) {
         try { return LocalDateTime.parse(s, sqlTsFmt); }
         catch (Exception ignore) { return null; }
+    }
+
+    // ----- NEW: appointments from server -----
+    private void refreshAppointmentsFromServer() {
+        Integer meId = Session.currentUserId();
+        if (meId == null) {
+            apptTable.setItems(FXCollections.observableArrayList());
+            return;
+        }
+        try {
+            ThsClient c = new ThsClient("127.0.0.1", ServerMain.PORT);
+            Response r = c.send("LIST_APPTS_FOR_PATIENT", Map.of("patient_id", meId));
+            if (!r.ok) {
+                apptTable.setItems(FXCollections.observableArrayList());
+                return;
+            }
+
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> rows = (List<Map<String, Object>>) r.data.get("appointments");
+
+            var list = rows.stream().map(m -> {
+                String id = String.valueOf(m.get("id"));
+                String specialist = String.valueOf(m.getOrDefault("doctor_name", "Doctor"));
+                String timeS = String.valueOf(m.get("start_time")); // "yyyy-MM-dd HH:mm:ss"
+                LocalDateTime ldt;
+                try { ldt = LocalDateTime.parse(timeS.replace(' ', 'T')); } catch (Exception e) { ldt = null; }
+                String location = String.valueOf(m.getOrDefault("notes", "Online"));
+                String pid = String.valueOf(meId);
+                return new Appointment(id, pid, specialist, ldt, location);
+            }).toList();
+
+            apptTable.setItems(FXCollections.observableArrayList(list));
+            apptTable.refresh();
+        } catch (Exception ex) {
+            apptTable.setItems(FXCollections.observableArrayList());
+            ex.printStackTrace();
+        }
     }
 
     @FXML

@@ -156,6 +156,45 @@ public class ClientHandler implements Runnable {
                 }
             }
 
+            case "ADD_APPOINTMENT": {
+                try {
+                    int patientId = ((Number) req.payload.get("patient_id")).intValue();
+                    int doctorId  = ((Number) req.payload.get("doctor_id")).intValue();
+                    String startS = (String) req.payload.get("start_time"); // ISO "yyyy-MM-dd'T'HH:mm"
+                    String endS   = (String) req.payload.get("end_time");
+                    String location = (String) req.payload.getOrDefault("location", "Online");
+                    String notes    = (String) req.payload.getOrDefault("notes", "");
+
+                    java.time.LocalDateTime start = java.time.LocalDateTime.parse(startS);
+                    java.time.LocalDateTime end   = java.time.LocalDateTime.parse(endS);
+
+                    com.fahim.ths.repo.AppointmentDAO.insert(patientId, doctorId, start, end, location, notes);
+                    return Response.ok(java.util.Map.of("status", "ok"));
+                } catch (Exception ex) {
+                    return Response.err("add appointment failed: " + ex.getMessage());
+                }
+            }
+
+            case "LIST_APPTS_FOR_PATIENT": {
+                try {
+                    int pid = ((Number) req.payload.get("patient_id")).intValue();
+                    var list = com.fahim.ths.repo.AppointmentDAO.listForPatient(pid);
+                    return Response.ok(java.util.Map.of("appointments", list));
+                } catch (Exception ex) {
+                    return Response.err("list patient appts failed: " + ex.getMessage());
+                }
+            }
+
+            case "LIST_APPTS_FOR_DOCTOR": {
+                try {
+                    int did = ((Number) req.payload.get("doctor_id")).intValue();
+                    var list = com.fahim.ths.repo.AppointmentDAO.listForDoctor(did);
+                    return Response.ok(java.util.Map.of("appointments", list));
+                } catch (Exception ex) {
+                    return Response.err("list doctor appts failed: " + ex.getMessage());
+                }
+            }
+
 
             default:
                 return Response.err("unknown op: " + req.op);

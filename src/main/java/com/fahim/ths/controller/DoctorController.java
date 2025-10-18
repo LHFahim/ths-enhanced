@@ -107,7 +107,36 @@ public class DoctorController {
     }
 
     private void refreshAppointments() {
-        apptTable.setItems(FXCollections.observableArrayList(db.getAppointments()));
+        try {
+            Integer doctorId = com.fahim.ths.Session.currentUserId();
+            if (doctorId == null) { apptTable.setItems(FXCollections.observableArrayList()); return; }
+
+            ThsClient c = new ThsClient("127.0.0.1", ServerMain.PORT);
+            Response r = c.send("LIST_APPTS_FOR_DOCTOR", Map.of("doctor_id", doctorId));
+            if (!r.ok) { apptTable.setItems(FXCollections.observableArrayList()); return; }
+
+            @SuppressWarnings("unchecked")
+            List<Map<String,Object>> rows = (List<Map<String,Object>>) r.data.get("appointments");
+
+            // Map the DB rows to your Appointment model for display (best-effort mapping)
+            var list = rows.stream().map(m -> {
+                String id = String.valueOf(m.get("id"));
+                String pid = String.valueOf(m.get("patient_id"));
+                String specialist = "Consultation"; // or use patient/doctor names as you prefer
+                String time = String.valueOf(m.get("start_time"));
+                String location = String.valueOf(m.getOrDefault("notes", "Online"));
+                // Your Appointment has (id, patientId, specialist, LocalDateTime, location):
+                LocalDateTime ldt;
+                try { ldt = LocalDateTime.parse(time.replace(' ', 'T')); } catch (Exception e) { ldt = null; }
+                return new Appointment(id, pid, specialist, ldt, location);
+            }).toList();
+
+            apptTable.setItems(FXCollections.observableArrayList(list));
+            apptTable.refresh();
+        } catch (Exception ex) {
+            apptTable.setItems(FXCollections.observableArrayList());
+            ex.printStackTrace();
+        }
     }
 
     private void refreshPrescriptions() {
