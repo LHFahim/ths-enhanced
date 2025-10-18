@@ -1,10 +1,15 @@
 package com.fahim.ths.controller;
 
+import com.fahim.ths.Response;
+import com.fahim.ths.ServerMain;
+import com.fahim.ths.ThsClient;
+
 import com.fahim.ths.model.Appointment;
 import com.fahim.ths.model.Prescription;
 import com.fahim.ths.model.VisitSummary;
 import com.fahim.ths.repo.DataStore;
 import com.fahim.ths.util.PdfExporter;
+
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.event.ActionEvent;
@@ -20,6 +25,8 @@ import java.io.File;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.List;
+import java.util.Map;
 
 public class DoctorController {
 
@@ -57,30 +64,43 @@ public class DoctorController {
     @FXML private Spinner<Integer> minuteSpinner;
     @FXML private TextField reasonField;
 
+    // ================= alerts (NEW tab) =================
+    @FXML private TextField alertPatientEmailField;
+    @FXML private TableView<AlertRow> alertsTable;
+    @FXML private TableColumn<AlertRow, String> aTypeCol;
+    @FXML private TableColumn<AlertRow, String> aSeverityCol;
+    @FXML private TableColumn<AlertRow, String> aMessageCol;
+    @FXML private TableColumn<AlertRow, String> aWhenCol;
+
     @FXML
     public void initialize() {
         // appointments
         idCol.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getId()));
-
         patientCol.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getPatientId()));
-
         specialistCol.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getSpecialist()));
-
         timeCol.setCellValueFactory(c -> new SimpleStringProperty(
                 c.getValue().getTime() == null ? "" : c.getValue().getTime().toString()));
-
         locationCol.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getLocation()));
 
         // time spinners
         hourSpinner.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(0, 23, 10));
         minuteSpinner.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(0, 59, 0, 5));
 
-        // prescriptions table --- show pending first; approved visible too
+        // prescriptions table
         rxIdCol.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getId()));
         rxPatientCol.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getPatientId()));
         rxMedCol.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getMedicine()));
         rxDoseCol.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getDosage()));
         rxApprovedCol.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().isApproved() ? "Yes" : "No"));
+
+        // alerts table (NEW)
+        if (alertsTable != null) { // safe if tab not loaded yet
+            aTypeCol.setCellValueFactory(c -> c.getValue().typeProp());
+            aSeverityCol.setCellValueFactory(c -> c.getValue().severityProp());
+            aMessageCol.setCellValueFactory(c -> c.getValue().messageProp());
+            aWhenCol.setCellValueFactory(c -> c.getValue().whenProp());
+            alertsTable.setItems(FXCollections.observableArrayList());
+        }
 
         refreshAppointments();
         refreshPrescriptions();
@@ -91,7 +111,6 @@ public class DoctorController {
     }
 
     private void refreshPrescriptions() {
-        // show unapproved first, then approved
         var all = db.allPrescriptions().stream().toList();
         var pendingFirst = all.stream().filter(p -> !p.isApproved()).toList();
         var approved = all.stream().filter(Prescription::isApproved).toList();
@@ -119,8 +138,8 @@ public class DoctorController {
         db.addVisitSummary(new VisitSummary(
                 selected.getId(),
                 selected.getPatientId(),
-                diagnosisArea.getText() == null ? "" : diagnosisArea.getText().trim(),
-                planArea.getText() == null ? "" : planArea.getText().trim(),
+                blankToEmpty(diagnosisArea.getText()),
+                blankToEmpty(planArea.getText()),
                 LocalDateTime.now()
         ));
 
@@ -155,9 +174,9 @@ public class DoctorController {
     // ================= prescriptions =================
     @FXML
     private void addPrescription(ActionEvent e) {
-        String pid = rxPatientIdField.getText() == null ? "" : rxPatientIdField.getText().trim();
-        String med = rxMedField.getText() == null ? "" : rxMedField.getText().trim();
-        String dose = rxDoseField.getText() == null ? "" : rxDoseField.getText().trim();
+        String pid = text(rxPatientIdField);
+        String med = text(rxMedField);
+        String dose = text(rxDoseField);
 
         if (pid.isEmpty() || med.isEmpty()) {
             new Alert(Alert.AlertType.ERROR, "Enter patient ID and medicine").show();
@@ -177,7 +196,6 @@ public class DoctorController {
     @FXML
     private void approveSelected(ActionEvent e) {
         Prescription sel = rxTable.getSelectionModel().getSelectedItem();
-
         if (sel == null) {
             new Alert(Alert.AlertType.ERROR, "Select a prescription first").show();
             return;
@@ -209,9 +227,7 @@ public class DoctorController {
     // ================= external booking =================
     @FXML
     private void makeExternalBooking(ActionEvent e) {
-        if (patientIdField.getText() == null || patientIdField.getText().isBlank()
-                || facilityField.getText() == null || facilityField.getText().isBlank()
-                || datePicker.getValue() == null) {
+        if (text(patientIdField).isBlank() || text(facilityField).isBlank() || datePicker.getValue() == null) {
             new Alert(Alert.AlertType.ERROR, "Fill in patient ID, hospital/clinic, and date").show();
             return;
         }
@@ -220,11 +236,10 @@ public class DoctorController {
         LocalDateTime dt = LocalDateTime.of(datePicker.getValue(), t);
 
         db.addAppointment(
-                patientIdField.getText().trim(),
+                text(patientIdField),
                 "External Facility",
                 dt,
-                facilityField.getText().trim() + (reasonField.getText() == null || reasonField.getText().isBlank()
-                        ? "" : (" (" + reasonField.getText().trim() + ")"))
+                text(facilityField) + (text(reasonField).isBlank() ? "" : (" (" + text(reasonField) + ")"))
         );
 
         new Alert(Alert.AlertType.INFORMATION, "External booking created").show();
@@ -237,14 +252,79 @@ public class DoctorController {
         refreshAppointments();
     }
 
+    // ================= Alerts tab actions (NEW) =================
+    @FXML
+    private void onLoadAlerts() {
+        try {
+            String email = text(alertPatientEmailField);
+            if (email.isEmpty()) {
+                new Alert(Alert.AlertType.ERROR, "Enter patient email").show();
+                return;
+            }
+
+            ThsClient c = new ThsClient("127.0.0.1", ServerMain.PORT);
+
+            // 1) resolve patient id from email
+            Response find = c.send("FIND_USER_BY_EMAIL", Map.of("email", email));
+            if (!find.ok) {
+                new Alert(Alert.AlertType.ERROR, "No such user: " + email).show();
+                return;
+            }
+            int pid = ((Number) find.data.get("id")).intValue();
+
+            // 2) fetch alerts for that patient
+            Response r = c.send("LIST_ALERTS_FOR_PATIENT", Map.of("patient_id", pid, "limit", 200));
+            if (!r.ok) {
+                new Alert(Alert.AlertType.ERROR, "Failed to load alerts: " + r.error).show();
+                return;
+            }
+
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> rows = (List<Map<String, Object>>) r.data.get("alerts");
+            var list = rows.stream().map(AlertRow::fromMap).toList();
+            alertsTable.getItems().setAll(list);
+
+        } catch (Exception ex) {
+            new Alert(Alert.AlertType.ERROR, "Error: " + ex.getMessage()).show();
+            ex.printStackTrace();
+        }
+    }
+
+    // tiny row model for alerts
+    public static class AlertRow {
+        private final javafx.beans.property.SimpleStringProperty type =
+                new javafx.beans.property.SimpleStringProperty();
+        private final javafx.beans.property.SimpleStringProperty severity =
+                new javafx.beans.property.SimpleStringProperty();
+        private final javafx.beans.property.SimpleStringProperty message =
+                new javafx.beans.property.SimpleStringProperty();
+        private final javafx.beans.property.SimpleStringProperty when =
+                new javafx.beans.property.SimpleStringProperty();
+
+        public AlertRow(String type, String severity, String message, String when) {
+            this.type.set(type); this.severity.set(severity); this.message.set(message); this.when.set(when);
+        }
+
+        public static AlertRow fromMap(Map<String, Object> m) {
+            String type = String.valueOf(m.get("type"));
+            String sev  = String.valueOf(m.get("severity"));
+            String msg  = String.valueOf(m.get("message"));
+            String at   = String.valueOf(m.get("created_at"));
+            return new AlertRow(type, sev, msg, at);
+        }
+
+        public javafx.beans.property.SimpleStringProperty typeProp(){ return type; }
+        public javafx.beans.property.SimpleStringProperty severityProp(){ return severity; }
+        public javafx.beans.property.SimpleStringProperty messageProp(){ return message; }
+        public javafx.beans.property.SimpleStringProperty whenProp(){ return when; }
+    }
+
     // ================= telehealth call =================
     @FXML
     private void startTelehealth(ActionEvent e) {
         javafx.stage.Window owner = ((Node) e.getSource()).getScene().getWindow();
         TelehealthCallController.open(owner);
     }
-
-
 
     // ================= logout =================
     @FXML
@@ -261,4 +341,8 @@ public class DoctorController {
             ex.printStackTrace();
         }
     }
+
+    // ===== helpers =====
+    private String text(TextField tf) { return tf.getText() == null ? "" : tf.getText().trim(); }
+    private String blankToEmpty(String s) { return (s == null || s.isBlank()) ? "" : s.trim(); }
 }
