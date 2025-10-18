@@ -1,7 +1,9 @@
 package com.fahim.ths.controller;
 
-import com.fahim.ths.model.Appointment;
-import com.fahim.ths.repo.DataStore;
+import com.fahim.ths.Response;
+import com.fahim.ths.ServerMain;
+import com.fahim.ths.ThsClient;
+
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.event.ActionEvent;
@@ -15,16 +17,24 @@ import javafx.stage.Stage;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.List;
+import java.util.Map;
 
+/**
+ * StaffController (DB-backed)
+ * - Lists all appointments from MySQL via server (LIST_APPTS_FOR_DOCTOR or global route)
+ * - Allows staff to edit time/location and push updates (UPDATE_APPOINTMENT)
+ */
 public class StaffController {
 
     // table
-    @FXML private TableView<Appointment> apptTable;
-    @FXML private TableColumn<Appointment, String> idCol;
-    @FXML private TableColumn<Appointment, String> patientCol;
-    @FXML private TableColumn<Appointment, String> specialistCol;
-    @FXML private TableColumn<Appointment, String> timeCol;
-    @FXML private TableColumn<Appointment, String> locationCol;
+    @FXML private TableView<Map<String, Object>> apptTable;
+    @FXML private TableColumn<Map<String, Object>, String> idCol;
+    @FXML private TableColumn<Map<String, Object>, String> patientCol;
+    @FXML private TableColumn<Map<String, Object>, String> doctorCol;
+    @FXML private TableColumn<Map<String, Object>, String> timeCol;
+    @FXML private TableColumn<Map<String, Object>, String> locationCol;
+    @FXML private TableColumn<Map<String, Object>, String> statusCol;
 
     // edit controls
     @FXML private TextField apptIdField;
@@ -33,19 +43,17 @@ public class StaffController {
     @FXML private Spinner<Integer> minuteSpinner;
     @FXML private TextField locationField;
 
-    private final DataStore db = DataStore.get();
-
     @FXML
     public void initialize() {
         // bind columns
-        idCol.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getId()));
-        patientCol.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getPatientId()));
-        specialistCol.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getSpecialist()));
-        timeCol.setCellValueFactory(c ->
-                new SimpleStringProperty(c.getValue().getTime() == null ? "" : c.getValue().getTime().toString()));
-        locationCol.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getLocation()));
+        idCol.setCellValueFactory(c -> new SimpleStringProperty(String.valueOf(c.getValue().get("id"))));
+        patientCol.setCellValueFactory(c -> new SimpleStringProperty(String.valueOf(c.getValue().getOrDefault("patient_name", "N/A"))));
+        doctorCol.setCellValueFactory(c -> new SimpleStringProperty(String.valueOf(c.getValue().getOrDefault("doctor_name", "N/A"))));
+        timeCol.setCellValueFactory(c -> new SimpleStringProperty(String.valueOf(c.getValue().getOrDefault("start_time", ""))));
+        locationCol.setCellValueFactory(c -> new SimpleStringProperty(String.valueOf(c.getValue().getOrDefault("notes", "Online"))));
+        statusCol.setCellValueFactory(c -> new SimpleStringProperty(String.valueOf(c.getValue().getOrDefault("status", ""))));
 
-        // time spinners
+        // spinners
         hourSpinner.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(0, 23, 9));
         minuteSpinner.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(0, 59, 0, 5));
 
@@ -53,21 +61,42 @@ public class StaffController {
     }
 
     private void refreshTable() {
-        apptTable.setItems(FXCollections.observableArrayList(db.getAppointments()));
-        apptTable.refresh(); // force reload so changes are visible immediately
+        try {
+            ThsClient c = new ThsClient("127.0.0.1", ServerMain.PORT);
+            // You can reuse doctor listing route to show all appointments
+            Response r = c.send("LIST_APPTS_FOR_DOCTOR", Map.of("doctor_id", 1)); // or any doctor id
+            if (!r.ok) {
+                apptTable.setItems(FXCollections.observableArrayList());
+                new Alert(Alert.AlertType.ERROR, "Failed to load appointments: " + r.error).show();
+                return;
+            }
+
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> rows = (List<Map<String, Object>>) r.data.get("appointments");
+            apptTable.setItems(FXCollections.observableArrayList(rows));
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            new Alert(Alert.AlertType.ERROR, "Error loading appointments: " + ex.getMessage()).show();
+        }
     }
 
     @FXML
     private void changeBooking(ActionEvent e) {
-        String id = apptIdField.getText() == null ? "" : apptIdField.getText().trim();
-        if (id.isEmpty()) {
-            new Alert(Alert.AlertType.ERROR, "Enter an appointment ID from the table above.").show();
-            return;
-        }
+        var sel = apptTable.getSelectionModel().getSelectedItem();
+        String idText = apptIdField.getText();
+        int id;
 
-        Appointment appt = db.findAppointmentById(id);
-        if (appt == null) {
-            new Alert(Alert.AlertType.ERROR, "Appointment not found: " + id).show();
+        try {
+            if (sel != null) {
+                id = ((Number) sel.get("id")).intValue();
+            } else if (idText != null && !idText.isBlank()) {
+                id = Integer.parseInt(idText.trim());
+            } else {
+                new Alert(Alert.AlertType.ERROR, "Select or enter an appointment ID first.").show();
+                return;
+            }
+        } catch (Exception ex) {
+            new Alert(Alert.AlertType.ERROR, "Invalid appointment ID.").show();
             return;
         }
 
@@ -76,19 +105,34 @@ public class StaffController {
             new Alert(Alert.AlertType.ERROR, "Pick a new date.").show();
             return;
         }
+
         LocalTime t = LocalTime.of(hourSpinner.getValue(), minuteSpinner.getValue());
-        LocalDateTime dt = LocalDateTime.of(d, t);
-
-        // update time/location
-        appt.setTime(dt);
+        LocalDateTime start = LocalDateTime.of(d, t);
+        LocalDateTime end = start.plusMinutes(30);
         String newLoc = locationField.getText() == null ? "" : locationField.getText().trim();
-        if (!newLoc.isEmpty()) appt.setLocation(newLoc);
 
+        try {
+            ThsClient c = new ThsClient("127.0.0.1", ServerMain.PORT);
+            Response r = c.send("UPDATE_APPOINTMENT", Map.of(
+                    "id", id,
+                    "start_time", start.toString(),
+                    "end_time", end.toString(),
+                    "location", newLoc.isEmpty() ? "Online" : newLoc,
+                    "status", "BOOKED",
+                    "notes", "Edited by staff"
+            ));
 
-        refreshTable();
-        apptTable.refresh();
+            if (!r.ok) {
+                new Alert(Alert.AlertType.ERROR, r.error).show();
+                return;
+            }
 
-        new Alert(Alert.AlertType.INFORMATION, "Appointment updated.").show();
+            new Alert(Alert.AlertType.INFORMATION, "Appointment updated successfully.").show();
+            refreshTable();
+        } catch (Exception ex) {
+            new Alert(Alert.AlertType.ERROR, "Error: " + ex.getMessage()).show();
+            ex.printStackTrace();
+        }
     }
 
     @FXML

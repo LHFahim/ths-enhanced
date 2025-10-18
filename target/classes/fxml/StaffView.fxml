@@ -8,20 +8,21 @@
 
   <top>
     <HBox spacing="10" alignment="CENTER_RIGHT" BorderPane.alignment="CENTER">
-      <Label text="Staff Portal — View &amp; Change Bookings"
+      <Label text="Staff Portal — Manage Appointments"
              style="-fx-font-size: 18px; -fx-font-weight: bold;"/>
       <Button text="Logout" onAction="#logout"/>
     </HBox>
   </top>
 
   <center>
-    <TableView fx:id="apptTable">
+    <TableView fx:id="apptTable" prefHeight="250">
       <columns>
-        <TableColumn fx:id="idCol"       text="ID"        prefWidth="80"/>
-        <TableColumn fx:id="patientCol"  text="Patient"   prefWidth="120"/>
-        <TableColumn fx:id="specialistCol" text="Specialist" prefWidth="160"/>
-        <TableColumn fx:id="timeCol"     text="Time"      prefWidth="220"/>
-        <TableColumn fx:id="locationCol" text="Location"  prefWidth="160"/>
+        <TableColumn fx:id="idCol" text="ID" prefWidth="60"/>
+        <TableColumn fx:id="patientCol" text="Patient" prefWidth="140"/>
+        <TableColumn fx:id="doctorCol" text="Doctor" prefWidth="140"/>
+        <TableColumn fx:id="timeCol" text="Start Time" prefWidth="180"/>
+        <TableColumn fx:id="locationCol" text="Location" prefWidth="160"/>
+        <TableColumn fx:id="statusCol" text="Status" prefWidth="100"/>
       </columns>
     </TableView>
   </center>
@@ -31,7 +32,8 @@
       <padding><Insets top="10" right="10" bottom="10" left="10"/></padding>
 
       <Label text="Appointment ID:" GridPane.columnIndex="0" GridPane.rowIndex="0"/>
-      <TextField fx:id="apptIdField" GridPane.columnIndex="1" GridPane.rowIndex="0"/>
+      <TextField fx:id="apptIdField" promptText="Select or enter ID"
+                 GridPane.columnIndex="1" GridPane.rowIndex="0"/>
 
       <Label text="New Date:" GridPane.columnIndex="0" GridPane.rowIndex="1"/>
       <DatePicker fx:id="datePicker" GridPane.columnIndex="1" GridPane.rowIndex="1"/>
@@ -43,7 +45,8 @@
       </HBox>
 
       <Label text="New Location:" GridPane.columnIndex="0" GridPane.rowIndex="3"/>
-      <TextField fx:id="locationField" GridPane.columnIndex="1" GridPane.rowIndex="3"/>
+      <TextField fx:id="locationField" promptText="Clinic / Online / etc"
+                 GridPane.columnIndex="1" GridPane.rowIndex="3"/>
 
       <Button text="Apply Change" onAction="#changeBooking"
               GridPane.columnIndex="1" GridPane.rowIndex="4"/>

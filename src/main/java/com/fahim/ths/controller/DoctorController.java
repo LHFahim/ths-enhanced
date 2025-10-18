@@ -2,13 +2,15 @@ package com.fahim.ths.controller;
 
 import com.fahim.ths.Response;
 import com.fahim.ths.ServerMain;
+import com.fahim.ths.Session;
 import com.fahim.ths.ThsClient;
-
 import com.fahim.ths.model.Appointment;
 import com.fahim.ths.model.Prescription;
 import com.fahim.ths.model.VisitSummary;
 import com.fahim.ths.repo.DataStore;
 import com.fahim.ths.util.PdfExporter;
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
@@ -22,7 +24,7 @@ import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 
 import java.io.File;
-import java.time.LocalDate;
+import java.lang.reflect.Type;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
@@ -31,6 +33,7 @@ import java.util.Map;
 public class DoctorController {
 
     private final DataStore db = DataStore.get();
+    private final Gson gson = new Gson();
 
     // ================= appointment Table =================
     @FXML private TableView<Appointment> apptTable;
@@ -64,22 +67,21 @@ public class DoctorController {
     @FXML private Spinner<Integer> minuteSpinner;
     @FXML private TextField reasonField;
 
-    // ================= alerts (NEW tab) =================
+    // ================= alerts (tab wiring kept) =================
     @FXML private TextField alertPatientEmailField;
     @FXML private TableView<AlertRow> alertsTable;
-    @FXML private TableColumn<AlertRow, String> aTypeCol;
-    @FXML private TableColumn<AlertRow, String> aSeverityCol;
-    @FXML private TableColumn<AlertRow, String> aMessageCol;
-    @FXML private TableColumn<AlertRow, String> aWhenCol;
+    @FXML private TableColumn<AlertRow, String> aTypeCol, aSeverityCol, aMessageCol, aWhenCol;
 
     @FXML
     public void initialize() {
         // appointments
         idCol.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getId()));
-        patientCol.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getPatientId()));
+        patientCol.setCellValueFactory(c -> new SimpleStringProperty(
+                c.getValue().getPatientName() != null ? c.getValue().getPatientName() : c.getValue().getPatientId()
+        ));
         specialistCol.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getSpecialist()));
-        timeCol.setCellValueFactory(c -> new SimpleStringProperty(
-                c.getValue().getTime() == null ? "" : c.getValue().getTime().toString()));
+        timeCol.setCellValueFactory(c ->
+                new SimpleStringProperty(c.getValue().getTime() == null ? "" : c.getValue().getTime().toString()));
         locationCol.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getLocation()));
 
         // time spinners
@@ -93,8 +95,8 @@ public class DoctorController {
         rxDoseCol.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getDosage()));
         rxApprovedCol.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().isApproved() ? "Yes" : "No"));
 
-        // alerts table (NEW)
-        if (alertsTable != null) { // safe if tab not loaded yet
+        // alerts table (optional)
+        if (alertsTable != null) {
             aTypeCol.setCellValueFactory(c -> c.getValue().typeProp());
             aSeverityCol.setCellValueFactory(c -> c.getValue().severityProp());
             aMessageCol.setCellValueFactory(c -> c.getValue().messageProp());
@@ -102,43 +104,50 @@ public class DoctorController {
             alertsTable.setItems(FXCollections.observableArrayList());
         }
 
-        refreshAppointments();
-        refreshPrescriptions();
+        refreshAppointments();   // DB-backed
+        refreshPrescriptions();  // local demo
     }
 
+    /** Load this doctor's appointments from MySQL via the server and map to Appointment model. */
     private void refreshAppointments() {
         try {
-            Integer doctorId = com.fahim.ths.Session.currentUserId();
-            if (doctorId == null) { apptTable.setItems(FXCollections.observableArrayList()); return; }
+            Integer doctorId = Session.currentUserId();
+
+            // Fallback: resolve default seeded doctor by email if session id is missing
+            if (doctorId == null) {
+                ThsClient c0 = new ThsClient("127.0.0.1", ServerMain.PORT);
+                Response f = c0.send("FIND_USER_BY_EMAIL", Map.of("email", "drsmith@example.com"));
+                if (f.ok) doctorId = ((Number) f.data.get("id")).intValue();
+            }
+
+            if (doctorId == null) {
+                apptTable.setItems(FXCollections.observableArrayList());
+                return;
+            }
 
             ThsClient c = new ThsClient("127.0.0.1", ServerMain.PORT);
             Response r = c.send("LIST_APPTS_FOR_DOCTOR", Map.of("doctor_id", doctorId));
-            if (!r.ok) { apptTable.setItems(FXCollections.observableArrayList()); return; }
 
-            @SuppressWarnings("unchecked")
-            List<Map<String,Object>> rows = (List<Map<String,Object>>) r.data.get("appointments");
+            if (!r.ok || r.data == null || !r.data.containsKey("appointments")) {
+                apptTable.setItems(FXCollections.observableArrayList());
+                return;
+            }
 
-            // Map the DB rows to your Appointment model for display (best-effort mapping)
-            var list = rows.stream().map(m -> {
-                String id = String.valueOf(m.get("id"));
-                String pid = String.valueOf(m.get("patient_id"));
-                String specialist = "Consultation"; // or use patient/doctor names as you prefer
-                String time = String.valueOf(m.get("start_time"));
-                String location = String.valueOf(m.getOrDefault("notes", "Online"));
-                // Your Appointment has (id, patientId, specialist, LocalDateTime, location):
-                LocalDateTime ldt;
-                try { ldt = LocalDateTime.parse(time.replace(' ', 'T')); } catch (Exception e) { ldt = null; }
-                return new Appointment(id, pid, specialist, ldt, location);
-            }).toList();
+            // Deserialize directly into List<Appointment>
+            String json = gson.toJson(r.data.get("appointments"));
+            Type listType = new TypeToken<List<Appointment>>() {}.getType();
+            List<Appointment> list = gson.fromJson(json, listType);
 
             apptTable.setItems(FXCollections.observableArrayList(list));
             apptTable.refresh();
+            System.out.println("Doctor appointments loaded: " + list.size());
         } catch (Exception ex) {
-            apptTable.setItems(FXCollections.observableArrayList());
             ex.printStackTrace();
+            apptTable.setItems(FXCollections.observableArrayList());
         }
     }
 
+    // ---------- the rest of your original methods stay unchanged ----------
     private void refreshPrescriptions() {
         var all = db.allPrescriptions().stream().toList();
         var pendingFirst = all.stream().filter(p -> !p.isApproved()).toList();
@@ -150,7 +159,6 @@ public class DoctorController {
         rxTable.refresh();
     }
 
-    // ================= diagnosis =================
     @FXML
     private void saveDiagnosis(ActionEvent e) {
         Appointment selected = apptTable.getSelectionModel().getSelectedItem();
@@ -177,7 +185,6 @@ public class DoctorController {
         planArea.clear();
     }
 
-    // ================= export visit summary =================
     @FXML
     private void exportSummary(ActionEvent e) {
         Appointment selected = apptTable.getSelectionModel().getSelectedItem();
@@ -200,7 +207,6 @@ public class DoctorController {
         }
     }
 
-    // ================= prescriptions =================
     @FXML
     private void addPrescription(ActionEvent e) {
         String pid = text(rxPatientIdField);
@@ -213,7 +219,7 @@ public class DoctorController {
         }
         if (dose.isEmpty()) dose = "1 tab daily";
 
-        db.addPrescription(pid, med, dose); // starts as approved=false
+        db.addPrescription(pid, med, dose);
         rxPatientIdField.clear();
         rxMedField.clear();
         rxDoseField.clear();
@@ -253,16 +259,63 @@ public class DoctorController {
         }
     }
 
-    // ================= external booking =================
+    public static class AlertRow {
+        private final javafx.beans.property.SimpleStringProperty type =
+                new javafx.beans.property.SimpleStringProperty();
+        private final javafx.beans.property.SimpleStringProperty severity =
+                new javafx.beans.property.SimpleStringProperty();
+        private final javafx.beans.property.SimpleStringProperty message =
+                new javafx.beans.property.SimpleStringProperty();
+        private final javafx.beans.property.SimpleStringProperty when =
+                new javafx.beans.property.SimpleStringProperty();
+
+        public AlertRow(String type, String severity, String message, String when) {
+            this.type.set(type); this.severity.set(severity); this.message.set(message); this.when.set(when);
+        }
+        public static AlertRow fromMap(Map<String, Object> m) {
+            return new AlertRow(
+                    String.valueOf(m.get("type")),
+                    String.valueOf(m.get("severity")),
+                    String.valueOf(m.get("message")),
+                    String.valueOf(m.get("created_at"))
+            );
+        }
+        public javafx.beans.property.SimpleStringProperty typeProp(){ return type; }
+        public javafx.beans.property.SimpleStringProperty severityProp(){ return severity; }
+        public javafx.beans.property.SimpleStringProperty messageProp(){ return message; }
+        public javafx.beans.property.SimpleStringProperty whenProp(){ return when; }
+    }
+
     @FXML
-    private void makeExternalBooking(ActionEvent e) {
+    private void startTelehealth(ActionEvent e) {
+        javafx.stage.Window owner = ((Node) e.getSource()).getScene().getWindow();
+        TelehealthCallController.open(owner);
+    }
+
+    @FXML
+    private void logout(ActionEvent e) {
+        try {
+            Scene scene = new Scene(
+                    FXMLLoader.load(getClass().getResource("/fxml/LoginView.fxml")),
+                    600, 400);
+            Stage st = (Stage) ((Node) e.getSource()).getScene().getWindow();
+            st.setScene(scene);
+            st.centerOnScreen();
+        } catch (Exception ex) {
+            new Alert(Alert.AlertType.ERROR, "Logout failed: " + ex.getMessage()).show();
+            ex.printStackTrace();
+        }
+    }
+
+    @FXML
+    public void makeExternalBooking() {
         if (text(patientIdField).isBlank() || text(facilityField).isBlank() || datePicker.getValue() == null) {
             new Alert(Alert.AlertType.ERROR, "Fill in patient ID, hospital/clinic, and date").show();
             return;
         }
 
-        LocalTime t = LocalTime.of(hourSpinner.getValue(), minuteSpinner.getValue());
-        LocalDateTime dt = LocalDateTime.of(datePicker.getValue(), t);
+        var t = LocalTime.of(hourSpinner.getValue(), minuteSpinner.getValue());
+        var dt = java.time.LocalDateTime.of(datePicker.getValue(), t);
 
         db.addAppointment(
                 text(patientIdField),
@@ -281,9 +334,8 @@ public class DoctorController {
         refreshAppointments();
     }
 
-    // ================= Alerts tab actions (NEW) =================
     @FXML
-    private void onLoadAlerts() {
+    public void onLoadAlerts() {
         try {
             String email = text(alertPatientEmailField);
             if (email.isEmpty()) {
@@ -293,7 +345,6 @@ public class DoctorController {
 
             ThsClient c = new ThsClient("127.0.0.1", ServerMain.PORT);
 
-            // 1) resolve patient id from email
             Response find = c.send("FIND_USER_BY_EMAIL", Map.of("email", email));
             if (!find.ok) {
                 new Alert(Alert.AlertType.ERROR, "No such user: " + email).show();
@@ -301,7 +352,6 @@ public class DoctorController {
             }
             int pid = ((Number) find.data.get("id")).intValue();
 
-            // 2) fetch alerts for that patient
             Response r = c.send("LIST_ALERTS_FOR_PATIENT", Map.of("patient_id", pid, "limit", 200));
             if (!r.ok) {
                 new Alert(Alert.AlertType.ERROR, "Failed to load alerts: " + r.error).show();
@@ -311,67 +361,17 @@ public class DoctorController {
             @SuppressWarnings("unchecked")
             List<Map<String, Object>> rows = (List<Map<String, Object>>) r.data.get("alerts");
             var list = rows.stream().map(AlertRow::fromMap).toList();
-            alertsTable.getItems().setAll(list);
 
+            if (alertsTable != null) {
+                alertsTable.getItems().setAll(list);
+                alertsTable.refresh();
+            }
         } catch (Exception ex) {
             new Alert(Alert.AlertType.ERROR, "Error: " + ex.getMessage()).show();
             ex.printStackTrace();
         }
     }
 
-    // tiny row model for alerts
-    public static class AlertRow {
-        private final javafx.beans.property.SimpleStringProperty type =
-                new javafx.beans.property.SimpleStringProperty();
-        private final javafx.beans.property.SimpleStringProperty severity =
-                new javafx.beans.property.SimpleStringProperty();
-        private final javafx.beans.property.SimpleStringProperty message =
-                new javafx.beans.property.SimpleStringProperty();
-        private final javafx.beans.property.SimpleStringProperty when =
-                new javafx.beans.property.SimpleStringProperty();
-
-        public AlertRow(String type, String severity, String message, String when) {
-            this.type.set(type); this.severity.set(severity); this.message.set(message); this.when.set(when);
-        }
-
-        public static AlertRow fromMap(Map<String, Object> m) {
-            String type = String.valueOf(m.get("type"));
-            String sev  = String.valueOf(m.get("severity"));
-            String msg  = String.valueOf(m.get("message"));
-            String at   = String.valueOf(m.get("created_at"));
-            return new AlertRow(type, sev, msg, at);
-        }
-
-        public javafx.beans.property.SimpleStringProperty typeProp(){ return type; }
-        public javafx.beans.property.SimpleStringProperty severityProp(){ return severity; }
-        public javafx.beans.property.SimpleStringProperty messageProp(){ return message; }
-        public javafx.beans.property.SimpleStringProperty whenProp(){ return when; }
-    }
-
-    // ================= telehealth call =================
-    @FXML
-    private void startTelehealth(ActionEvent e) {
-        javafx.stage.Window owner = ((Node) e.getSource()).getScene().getWindow();
-        TelehealthCallController.open(owner);
-    }
-
-    // ================= logout =================
-    @FXML
-    private void logout(ActionEvent e) {
-        try {
-            Scene scene = new Scene(
-                    FXMLLoader.load(getClass().getResource("/fxml/LoginView.fxml")),
-                    600, 400);
-            Stage st = (Stage) ((Node) e.getSource()).getScene().getWindow();
-            st.setScene(scene);
-            st.centerOnScreen();
-        } catch (Exception ex) {
-            new Alert(Alert.AlertType.ERROR, "Logout failed: " + ex.getMessage()).show();
-            ex.printStackTrace();
-        }
-    }
-
-    // ===== helpers =====
     private String text(TextField tf) { return tf.getText() == null ? "" : tf.getText().trim(); }
     private String blankToEmpty(String s) { return (s == null || s.isBlank()) ? "" : s.trim(); }
 }

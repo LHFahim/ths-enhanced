@@ -6,6 +6,7 @@ import java.util.*;
 
 public class AppointmentDAO {
 
+    // insert new appointment
     public static void insert(int patientId, int doctorId, LocalDateTime start, LocalDateTime end,
                               String location, String notes) throws SQLException {
         try (Connection c = Database.getAppConnection();
@@ -17,11 +18,18 @@ public class AppointmentDAO {
             ps.setInt(2, doctorId);
             ps.setTimestamp(3, Timestamp.valueOf(start));
             ps.setTimestamp(4, Timestamp.valueOf(end));
-            ps.setString(5, notes);
+
+            // combine both location + notes safely
+            String combinedNotes = (location == null || location.isBlank())
+                    ? notes
+                    : (notes == null || notes.isBlank() ? location : (location + " — " + notes));
+
+            ps.setString(5, combinedNotes);
             ps.executeUpdate();
         }
     }
 
+    // list appointments for patient
     public static List<Map<String,Object>> listForPatient(int patientId) throws SQLException {
         String sql = """
           SELECT a.id, a.start_time, a.end_time, a.status, a.notes,
@@ -34,6 +42,7 @@ public class AppointmentDAO {
         return listBy(sql, patientId);
     }
 
+    // list appointments for doctor
     public static List<Map<String,Object>> listForDoctor(int doctorId) throws SQLException {
         String sql = """
           SELECT a.id, a.start_time, a.end_time, a.status, a.notes,
@@ -46,6 +55,7 @@ public class AppointmentDAO {
         return listBy(sql, doctorId);
     }
 
+    // shared helper
     private static List<Map<String,Object>> listBy(String sql, int id) throws SQLException {
         List<Map<String,Object>> out = new ArrayList<>();
         try (Connection c = Database.getAppConnection();
@@ -59,10 +69,8 @@ public class AppointmentDAO {
                 m.put("end_time", rs.getTimestamp("end_time").toString());
                 m.put("status", rs.getString("status"));
                 m.put("notes", rs.getString("notes"));
-                // include both sides for convenience
                 m.put("patient_id", rs.getObject("patient_id"));
                 m.put("doctor_id",  rs.getObject("doctor_id"));
-                // optional display names depending on query
                 if (hasColumn(rs, "patient_name")) m.put("patient_name", rs.getString("patient_name"));
                 if (hasColumn(rs, "doctor_name"))  m.put("doctor_name", rs.getString("doctor_name"));
                 m.put("created_at", rs.getTimestamp("created_at").toString());
@@ -74,5 +82,29 @@ public class AppointmentDAO {
 
     private static boolean hasColumn(ResultSet rs, String name) {
         try { return rs.findColumn(name) > 0; } catch (SQLException e) { return false; }
+    }
+
+    // ✅ fixed update method (use notes instead of location)
+    public static void update(int id, LocalDateTime start, LocalDateTime end,
+                              String location, String status, String notes) throws SQLException {
+        try (Connection c = Database.getAppConnection();
+             PreparedStatement ps = c.prepareStatement("""
+             UPDATE appointments
+             SET start_time = ?, end_time = ?, notes = ?, status = ?
+             WHERE id = ?
+         """)) {
+            ps.setTimestamp(1, Timestamp.valueOf(start));
+            ps.setTimestamp(2, Timestamp.valueOf(end));
+
+            // safely merge updated location/notes
+            String combinedNotes = (location == null || location.isBlank())
+                    ? notes
+                    : (notes == null || notes.isBlank() ? location : (location + " — " + notes));
+
+            ps.setString(3, combinedNotes);
+            ps.setString(4, status);
+            ps.setInt(5, id);
+            ps.executeUpdate();
+        }
     }
 }

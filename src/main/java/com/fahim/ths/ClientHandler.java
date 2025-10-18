@@ -175,6 +175,25 @@ public class ClientHandler implements Runnable {
                 }
             }
 
+            case "UPDATE_APPOINTMENT": {
+                try {
+                    int id = ((Number) req.payload.get("id")).intValue();
+                    String startS = (String) req.payload.get("start_time");
+                    String endS   = (String) req.payload.get("end_time");
+                    String location = (String) req.payload.getOrDefault("location", "Online");
+                    String status   = (String) req.payload.getOrDefault("status", "BOOKED");
+                    String notes    = (String) req.payload.getOrDefault("notes", "");
+
+                    java.time.LocalDateTime start = java.time.LocalDateTime.parse(startS);
+                    java.time.LocalDateTime end   = java.time.LocalDateTime.parse(endS);
+
+                    com.fahim.ths.repo.AppointmentDAO.update(id, start, end, location, status, notes);
+                    return Response.ok(Map.of("updated", true));
+                } catch (Exception ex) {
+                    return Response.err("update appointment failed: " + ex.getMessage());
+                }
+            }
+
             case "LIST_APPTS_FOR_PATIENT": {
                 try {
                     int pid = ((Number) req.payload.get("patient_id")).intValue();
@@ -185,10 +204,15 @@ public class ClientHandler implements Runnable {
                 }
             }
 
+
+
             case "LIST_APPTS_FOR_DOCTOR": {
                 try {
                     int did = ((Number) req.payload.get("doctor_id")).intValue();
+
                     var list = com.fahim.ths.repo.AppointmentDAO.listForDoctor(did);
+
+                    System.out.println("test" + list);
                     return Response.ok(java.util.Map.of("appointments", list));
                 } catch (Exception ex) {
                     return Response.err("list doctor appts failed: " + ex.getMessage());

@@ -15,6 +15,7 @@ public class MainApp extends Application {
 
     @Override
     public void start(Stage stage) throws Exception {
+
         try {
             // init database and create tables automatically
             DatabaseInit.init();
