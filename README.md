@@ -1,7 +1,7 @@
 #  Telehealth System (THS-Enhanced)
 
 > **COIT20258 – Software Engineering (Assignment 3)**  
-> Developed by **Fahim (12274871)** & **Raqib**
+> Developed by **Fahim** & **Raqib**
 
 ---
 
