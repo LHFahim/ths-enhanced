@@ -15,17 +15,31 @@ The system implements a **3-tier architecture (MVC)** with a **JavaFX client**, 
 ---
 
 ## Project Structure
-ths-enhanced/
-│
+```ths-enhanced/
 ├── src/main/java/com/fahim/ths/
-│ ├── controller/ # JavaFX controllers (Doctor, Patient, Admin)
-│ ├── model/ # Entity classes (Appointment, User, Prescription)
-│ ├── service/ # Business logic and communication layer
-│ ├── util/ # Database utilities and helper classes
-│ ├── server/ # Multi-threaded server implementation
-│ └── Main.java # Client entry point (JavaFX GUI)
+│   ├── controller/        # JavaFX controllers (Doctor, Patient, Admin)
+│   ├── model/             # Entity classes (Appointment, User, Prescription)
+│   ├── service/           # Business logic and communication layer
+│   ├── util/              # Database utilities and helper classes
+│   ├── server/            # Multi-threaded server implementation
+│   └── Main.java          # Client entry point (JavaFX GUI)
 │
-├── src/main/resources/fxml/ # FXML layout files for the GUI
-├── src/main/resources/sql/ # Database initialization scripts
-├── pom.xml # Maven build file (if used)
+├── src/main/resources/fxml/   # FXML layout files for the GUI
+├── src/main/resources/sql/    # Database initialization scripts
+├── pom.xml                    # Maven build file (if used)
 └── README.md
+```
+
+
+---
+
+##  Setup & Run Instructions (IntelliJ IDEA)
+
+### Prerequisites
+Make sure you have the following installed:
+- **JDK 21 or later**
+- **JavaFX SDK 21 or later** → [Download Here](https://gluonhq.com/products/javafx/)
+- **MySQL Server 8.0+**
+- **IntelliJ IDEA** (Community or Ultimate)
+
+---
