@@ -15,7 +15,7 @@
                 <Label text="username:" GridPane.rowIndex="0" GridPane.columnIndex="0"/>
                 <TextField fx:id="usernameField" promptText="patient" GridPane.rowIndex="0" GridPane.columnIndex="1"/>
                 <Label text="password:" GridPane.rowIndex="1" GridPane.columnIndex="0"/>
-                <PasswordField fx:id="passwordField" promptText="any" GridPane.rowIndex="1" GridPane.columnIndex="1"/>
+                <PasswordField fx:id="passwordField" promptText="pass123" GridPane.rowIndex="1" GridPane.columnIndex="1"/>
             </GridPane>
             <Button text="login" onAction="#onLogin" />
         </VBox>

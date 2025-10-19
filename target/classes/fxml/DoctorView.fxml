@@ -15,14 +15,14 @@
         </HBox>
     </top>
 
-    <!-- Put TableView + TabPane together so the table gets real height -->
+
     <center>
         <VBox spacing="8">
             <padding>
                 <Insets top="6" right="8" bottom="8" left="8"/>
             </padding>
 
-            <!-- Appointments table: give it space and let it grow -->
+
             <TableView fx:id="apptTable" prefHeight="300" minHeight="240" VBox.vgrow="ALWAYS">
                 <columns>
                     <TableColumn fx:id="idCol"         text="ID"         prefWidth="80"/>
