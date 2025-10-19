@@ -76,7 +76,7 @@ import java.util.concurrent.Executors;
 public class ServerMain {
     public static final int PORT = 5050;
 
-    /** Standalone entrypoint: run this class by itself. */
+    /** standalone entrypoint: run this class by itself. */
     public static void main(String[] args) {
         try {
             startBlocking(); // runs forever until you stop it
@@ -85,9 +85,9 @@ public class ServerMain {
         }
     }
 
-    /** Core server loop. */
+
     private static void startBlocking() throws Exception {
-        // Ensure DB schema/seed users exist
+        // ensuring DB schema/seed users exist
         try { DatabaseInit.init(); } catch (Exception initEx) { initEx.printStackTrace(); }
 
         ExecutorService pool = Executors.newFixedThreadPool(16);
@@ -96,7 +96,7 @@ public class ServerMain {
         try (ServerSocket server = new ServerSocket(PORT)) {
             while (true) {
                 Socket s = server.accept();
-                // Your existing request handler that serves doctor/patient commands
+
                 pool.submit(new ClientHandler(s));
             }
         } catch (IOException e) {

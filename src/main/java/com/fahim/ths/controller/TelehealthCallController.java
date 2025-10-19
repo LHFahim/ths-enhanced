@@ -21,7 +21,7 @@ import java.io.IOException;
  * - call timer
  * - mute/unmute
  * - simulate network drop
- * - end call (closes window)
+ * - end call
  */
 public class TelehealthCallController {
 
@@ -88,8 +88,7 @@ public class TelehealthCallController {
             stage.show();
         } catch (IOException ex) {
             ex.printStackTrace();
-            // fallback: simple alert if needed (but usually not necessary)
-            // new Alert(Alert.AlertType.ERROR, "Could not open Telehealth window: " + ex.getMessage()).show();
+
         }
     }
 }

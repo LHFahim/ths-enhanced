@@ -53,7 +53,7 @@ public class LoginController {
             // choose FXML by role
             String fxml = switch (role) {
                 case "PATIENT" -> "/fxml/PatientView.fxml";
-                case "STAFF"   -> "/fxml/StaffView.fxml"; // optional, if you have one
+                case "STAFF"   -> "/fxml/StaffView.fxml";
                 case "DOCTOR"  -> "/fxml/DoctorView.fxml";
                 default -> null;
             };

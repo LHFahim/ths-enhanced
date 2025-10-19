@@ -11,7 +11,7 @@ public class AlertRules {
                                               Double sys, Double dia) throws SQLException {
         int count = 0;
 
-        // Blood pressure (WARN / CRIT)
+
         if (sys != null && dia != null) {
             if (sys >= 180 || dia >= 120) {
                 AlertDAO.insert(patientId, "BP", "CRIT",
@@ -24,7 +24,7 @@ public class AlertRules {
             }
         }
 
-        // Temperature
+
         if (temp != null) {
             if (temp >= 39.5) {
                 AlertDAO.insert(patientId, "TEMP", "CRIT",
@@ -37,14 +37,14 @@ public class AlertRules {
             }
         }
 
-        // Respiration
+
         if (resp != null && resp >= 24) {
             AlertDAO.insert(patientId, "RESP", "WARN",
                     String.format("Respiration fast (%.0f breaths/min)", resp));
             count++;
         }
 
-        // Pulse
+
         if (pulse != null) {
             if (pulse >= 140) {
                 AlertDAO.insert(patientId, "PULSE", "CRIT",

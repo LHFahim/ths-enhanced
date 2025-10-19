@@ -147,7 +147,7 @@ public class DoctorController {
         }
     }
 
-    // ---------- the rest of your original methods stay unchanged ----------
+
     private void refreshPrescriptions() {
         var all = db.allPrescriptions().stream().toList();
         var pendingFirst = all.stream().filter(p -> !p.isApproved()).toList();

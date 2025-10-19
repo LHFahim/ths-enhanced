@@ -20,11 +20,7 @@ import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
 
-/**
- * StaffController (DB-backed)
- * - Lists all appointments from MySQL via server (LIST_APPTS_FOR_DOCTOR or global route)
- * - Allows staff to edit time/location and push updates (UPDATE_APPOINTMENT)
- */
+
 public class StaffController {
 
     // table
@@ -63,7 +59,7 @@ public class StaffController {
     private void refreshTable() {
         try {
             ThsClient c = new ThsClient("127.0.0.1", ServerMain.PORT);
-            // You can reuse doctor listing route to show all appointments
+
             Response r = c.send("LIST_APPTS_FOR_DOCTOR", Map.of("doctor_id", 1)); // or any doctor id
             if (!r.ok) {
                 apptTable.setItems(FXCollections.observableArrayList());

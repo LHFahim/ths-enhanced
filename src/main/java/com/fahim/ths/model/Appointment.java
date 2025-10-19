@@ -32,7 +32,7 @@ public class Appointment {
 
     private String specialist; // for display
 
-    // 👇 IMPORTANT: mark as transient so Gson doesn't reflect into LocalDateTime
+
     private transient LocalDateTime time;
 
     public Appointment() {}
@@ -56,7 +56,7 @@ public class Appointment {
     public void setTime(LocalDateTime t){ this.time = t; }
     public void setLocation(String l){ this.location = l; }
 
-    /** Parse start_time on demand */
+
     public LocalDateTime getTime(){
         if (time != null) return time;
         if (startTimeRaw == null) return null;

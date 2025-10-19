@@ -37,7 +37,7 @@ import java.util.Map;
  */
 public class PatientController {
 
-    private final DataStore db = DataStore.get(); // still used for prescriptions in this prototype
+    private final DataStore db = DataStore.get();
 
     // ================= book consultation =================
     @FXML private TextField specialistField;
@@ -80,7 +80,7 @@ public class PatientController {
     // ================= initialization =================
     @FXML
     public void initialize() {
-        // spinners (UI defaults)
+        // spinners
         hourSpinner.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(0, 23, 10));
         minuteSpinner.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(0, 59, 0, 5));
 
@@ -119,7 +119,7 @@ public class PatientController {
         // appointments from DB via server
         refreshAppointmentsFromServer();
 
-        // prescriptions still from DataStore (demo)
+        // prescriptions still from DataStore
         rxTable.setItems(FXCollections.observableArrayList(
                 db.allPrescriptions().stream().filter(r -> r.getPatientId().equals("P001")).toList()));
 
@@ -147,8 +147,7 @@ public class PatientController {
         try {
             ThsClient c = new ThsClient("127.0.0.1", ServerMain.PORT);
 
-            // pick doctor:
-            // if user typed an email, resolve that; otherwise default to drsmith@example.com
+
             String docEmail = specialist.contains("@") ? specialist : "drsmith@example.com";
             Response f = c.send("FIND_USER_BY_EMAIL", Map.of("email", docEmail));
             if (!f.ok) { new Alert(Alert.AlertType.ERROR, "Doctor not found: " + docEmail).show(); return; }

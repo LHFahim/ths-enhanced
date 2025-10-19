@@ -84,7 +84,7 @@ public class AppointmentDAO {
         try { return rs.findColumn(name) > 0; } catch (SQLException e) { return false; }
     }
 
-    // ✅ fixed update method (use notes instead of location)
+
     public static void update(int id, LocalDateTime start, LocalDateTime end,
                               String location, String status, String notes) throws SQLException {
         try (Connection c = Database.getAppConnection();
